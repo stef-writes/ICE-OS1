@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+openai
+networkx # For graph operations 
+pymongo # MongoDB driver
+motor # Async MongoDB driver for FastAPI 
+anthropic # For Anthropic API access 
+google-generativeai # For Gemini API access
+deepseek # For Deepseek API access 
