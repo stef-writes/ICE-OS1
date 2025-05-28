@@ -14,9 +14,9 @@ SESSION_ID = f"test_session_{int(time.time())}"
 print(f"Using test session ID: {SESSION_ID}")
 print(f"API Base URL: {API_BASE_URL}")
 
-def make_api_request(method, endpoint, data=None):
+def make_api_request(method, endpoint_path, data=None):
     """Helper function to make API requests with proper error handling"""
-    url = f"{API_BASE_URL}{endpoint}?session_id={SESSION_ID}"
+    url = f"{API_BASE_URL}{endpoint_path}?session_id={SESSION_ID}"
     headers = {"Content-Type": "application/json"}
     
     try:
@@ -118,12 +118,12 @@ def create_chained_math_test():
                 "llm_config": node["llm_config"]
             }
             
-            result = make_api_request("POST", "/add_node", node_data)
+            result = make_api_request("POST", "/api/graph/add_node", node_data)
             print(f"  ✓ Node created: {result.get('message', 'Success')}")
             
             # Set the prompt
             prompt_data = {"prompt": node["prompt"]}
-            make_api_request("PUT", f"/nodes/{node['id']}/prompt", prompt_data)
+            make_api_request("PUT", f"/api/db/nodes/{node['id']}/prompt", prompt_data)
             print(f"  ✓ Prompt set: {node['prompt'][:50]}...")
         
         print()
@@ -139,7 +139,7 @@ def create_chained_math_test():
         
         for from_node, to_node in edges:
             edge_data = {"from_node": from_node, "to_node": to_node}
-            result = make_api_request("POST", "/add_edge", edge_data)
+            result = make_api_request("POST", "/api/graph/add_edge", edge_data)
             print(f"  ✓ Edge created: {from_node[:15]}... -> {to_node[:15]}...")
         
         print()
@@ -162,7 +162,7 @@ def create_chained_math_test():
             "context_data": context_data
         }
         
-        result = make_api_request("POST", "/generate_text_node", payload)
+        result = make_api_request("POST", "/api/graph/generate_text_node", payload)
         actual_outputs[nodes[0]["id"]] = result["generated_text"].strip()
         print(f"Output: {actual_outputs[nodes[0]['id']]}")
         print(f"Expected: {nodes[0]['expected_output']}")
@@ -184,7 +184,7 @@ def create_chained_math_test():
             "context_data": context_data
         }
         
-        result = make_api_request("POST", "/generate_text_node", payload)
+        result = make_api_request("POST", "/api/graph/generate_text_node", payload)
         actual_outputs[nodes[1]["id"]] = result["generated_text"].strip()
         print(f"Output: {actual_outputs[nodes[1]['id']]}")
         print(f"Expected: {nodes[1]['expected_output']}")
@@ -206,7 +206,7 @@ def create_chained_math_test():
             "context_data": context_data
         }
         
-        result = make_api_request("POST", "/generate_text_node", payload)
+        result = make_api_request("POST", "/api/graph/generate_text_node", payload)
         actual_outputs[nodes[2]["id"]] = result["generated_text"].strip()
         print(f"Output: {actual_outputs[nodes[2]['id']]}")
         print(f"Expected: {nodes[2]['expected_output']}")
@@ -233,7 +233,7 @@ def create_chained_math_test():
             "context_data": context_data
         }
         
-        result = make_api_request("POST", "/generate_text_node", payload)
+        result = make_api_request("POST", "/api/graph/generate_text_node", payload)
         actual_outputs[nodes[3]["id"]] = result["generated_text"].strip()
         print(f"Output: {actual_outputs[nodes[3]['id']]}")
         print(f"Expected: {nodes[3]['expected_output']}")

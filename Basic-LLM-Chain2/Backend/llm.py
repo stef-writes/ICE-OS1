@@ -6,8 +6,20 @@ from contextlib import contextmanager
 import time
 from typing import Dict, Any, Literal
 import google.generativeai as genai # Added for Gemini
+import httpx # Added for explicit http client control
 
 load_dotenv()
+
+# --- AGGRESSIVE PROXY ENV VAR CLEARING (Diagnostic) ---
+print("Attempting to clear proxy environment variables from within llm.py...")
+for proxy_var in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]:
+    if proxy_var in os.environ:
+        print(f"  Found and deleting: {proxy_var} = '{os.environ[proxy_var]}'")
+        del os.environ[proxy_var]
+    else:
+        print(f"  {proxy_var} not found in os.environ.")
+print("Proxy environment variables cleared (if present).")
+# --- END AGGRESSIVE PROXY ENV VAR CLEARING ---
 
 # --- LLM Configuration Class ---
 class LLMConfig:
@@ -145,7 +157,9 @@ if not openai_api_key:
     print("Warning: OPENAI_API_KEY not found. OpenAI models will not be available.")
 else:
     try:
-        openai_client = AsyncOpenAI(api_key=openai_api_key)
+        # Create an httpx client that doesn't trust environment variables for proxies
+        custom_http_client = httpx.AsyncClient(trust_env=False)
+        openai_client = AsyncOpenAI(api_key=openai_api_key, http_client=custom_http_client)
         print("--- OpenAI Client Initialized Successfully ---")
     except Exception as e:
         print(f"Error setting up OpenAI client: {e}")
@@ -164,10 +178,12 @@ if not deepseek_api_key:
     print("Warning: DEEPSEEK_API_KEY not found. DeepSeek models will not be available.")
 else:
     try:
-        # Use OpenAI's AsyncOpenAI client with DeepSeek's base_url
+        # Create an httpx client that doesn't trust environment variables for proxies
+        custom_http_client_deepseek = httpx.AsyncClient(trust_env=False)
         deepseek_client = AsyncOpenAI(
             api_key=deepseek_api_key,
-            base_url="https://api.deepseek.com" # Correct base URL for DeepSeek
+            base_url="https://api.deepseek.com", # Correct base URL for DeepSeek
+            http_client=custom_http_client_deepseek
         )
         print("--- DeepSeek Client Initialized Successfully ---")
     except Exception as e:

@@ -55,55 +55,71 @@ def create_test_chain():
                 "model": "gpt-4",
                 "temperature": 0.7,
                 "max_tokens": 100
-            }
+            },
+            "input_keys": [],
+            "output_keys": ["generated_text"]
         },
         {
             "node_id": "market_research",
             "name": "Market Research",
             "node_type": "text_generation", 
-            "prompt": "Research the market potential for this business idea: {Idea Generator}",
+            "prompt": "Research the market potential for this business idea: {generated_text}",
             "llm_config": {
                 "provider": "anthropic",
                 "model": "claude-3-haiku-20240307",
                 "temperature": 0.5,
                 "max_tokens": 200
-            }
+            },
+            "input_keys": ["generated_text"],
+            "output_keys": ["generated_text"]
         },
         {
             "node_id": "technical_analysis",
             "name": "Technical Analysis",
             "node_type": "text_generation",
-            "prompt": "Analyze the technical feasibility of this idea: {Idea Generator}",
+            "prompt": "Analyze the technical feasibility of this idea: {generated_text}",
             "llm_config": {
                 "provider": "openai",
                 "model": "gpt-4",
                 "temperature": 0.3,
                 "max_tokens": 200
-            }
+            },
+            "input_keys": ["generated_text"],
+            "output_keys": ["generated_text"]
         },
         {
             "node_id": "financial_projection",
             "name": "Financial Projection",
             "node_type": "text_generation",
-            "prompt": "Create financial projections for this business: {Idea Generator}",
+            "prompt": "Create financial projections for this business: {generated_text}",
             "llm_config": {
                 "provider": "anthropic",
                 "model": "claude-3-sonnet-20240229",
                 "temperature": 0.4,
                 "max_tokens": 250
-            }
+            },
+            "input_keys": ["generated_text"],
+            "output_keys": ["generated_text"]
         },
         {
             "node_id": "final_report",
             "name": "Final Report",
             "node_type": "text_generation",
-            "prompt": "Create a comprehensive business plan summary based on:\nIdea: {Idea Generator}\nMarket: {Market Research}\nTechnical: {Technical Analysis}\nFinancial: {Financial Projection}",
+            "prompt": (
+                "Create a comprehensive business plan summary based on:\n"
+                "Idea: {generated_text}\n"
+                "Market: {generated_text}\n"
+                "Technical: {generated_text}\n"
+                "Financial: {generated_text}"
+            ),
             "llm_config": {
                 "provider": "openai",
                 "model": "gpt-4",
                 "temperature": 0.6,
                 "max_tokens": 400
-            }
+            },
+            "input_keys": ["generated_text"],
+            "output_keys": ["generated_text"]
         }
     ]
     
@@ -113,21 +129,19 @@ def create_test_chain():
             "node_id": node["node_id"],
             "name": node["name"],
             "node_type": node["node_type"],
-            "input_keys": [],
-            "output_keys": ["generated_text"],
+            "input_keys": node["input_keys"],
+            "output_keys": node["output_keys"],
             "llm_config": node["llm_config"]
         }
         
-        result = make_api_request("POST", "/add_node", node_data)
+        result = make_api_request("POST", "/api/graph/add_node", node_data)
         print(f"  ✅ Created node: {node['name']}")
         
         # Set the prompt
         prompt_data = {"prompt": node["prompt"]}
-        make_api_request("PUT", f"/nodes/{node['node_id']}/prompt", prompt_data)
+        make_api_request("PUT", f"/api/db/nodes/{node['node_id']}/prompt", prompt_data)
     
     # Create edges to define dependencies
-    # This creates a structure where market_research, technical_analysis, and financial_projection
-    # can run in parallel after idea_generator completes
     edges = [
         ("idea_generator", "market_research"),
         ("idea_generator", "technical_analysis"), 
@@ -139,7 +153,7 @@ def create_test_chain():
     
     for from_node, to_node in edges:
         edge_data = {"from_node": from_node, "to_node": to_node}
-        make_api_request("POST", "/add_edge", edge_data)
+        make_api_request("POST", "/api/graph/add_edge", edge_data)
         print(f"  🔗 Created edge: {from_node} → {to_node}")
     
     print("✅ Test chain created successfully!")
@@ -162,7 +176,7 @@ def test_execution_performance():
     print("\n📈 Testing Sequential Execution...")
     start_time = time.time()
     try:
-        sequential_result = make_api_request("POST", "/execute_sequential")
+        sequential_result = make_api_request("POST", "/api/execute/execute_sequential")
         sequential_time = time.time() - start_time
         sequential_success = True
         print(f"✅ Sequential execution completed in {sequential_time:.2f} seconds")
@@ -172,6 +186,22 @@ def test_execution_performance():
             print(f"   📊 Tokens: {stats.get('total_tokens', 'N/A')}")
             print(f"   💰 Cost: ${stats.get('total_cost', 0):.4f}")
             print(f"   🔄 Mode: {stats.get('execution_mode', 'unknown')}")
+            
+            # Print node outputs for debugging
+            if "results" in sequential_result:
+                print("\n   📝 Node Outputs:")
+                for node_id, output in sequential_result["results"].items():
+                    if isinstance(output, dict):
+                        if "error" in output:
+                            print(f"   - {node_id}: ❌ Error - {output['error']}")
+                        elif "output" in output:
+                            print(f"   - {node_id}: {output['output'][:100]}...")
+                        elif "generated_text" in output:
+                            print(f"   - {node_id}: {output['generated_text'][:100]}...")
+                        else:
+                            print(f"   - {node_id}: {str(output)[:100]}...")
+                    else:
+                        print(f"   - {node_id}: {str(output)[:100]}...")
     except Exception as e:
         print(f"❌ Sequential execution failed: {e}")
         sequential_success = False
@@ -184,7 +214,7 @@ def test_execution_performance():
     print("\n⚡ Testing Concurrent Execution...")
     start_time = time.time()
     try:
-        concurrent_result = make_api_request("POST", "/execute_concurrent")
+        concurrent_result = make_api_request("POST", "/api/execute/execute_concurrent")
         concurrent_time = time.time() - start_time
         concurrent_success = True
         print(f"✅ Concurrent execution completed in {concurrent_time:.2f} seconds")
@@ -196,6 +226,22 @@ def test_execution_performance():
             print(f"   🔄 Mode: {stats.get('execution_mode', 'unknown')}")
             print(f"   ⏱️ Execution time: {stats.get('execution_time', 'N/A')}s")
             print(f"   ✅ Nodes completed: {stats.get('nodes_completed', 'N/A')}/{stats.get('nodes_total', 'N/A')}")
+            
+            # Print node outputs for debugging
+            if "results" in concurrent_result:
+                print("\n   📝 Node Outputs:")
+                for node_id, output in concurrent_result["results"].items():
+                    if isinstance(output, dict):
+                        if "error" in output:
+                            print(f"   - {node_id}: ❌ Error - {output['error']}")
+                        elif "output" in output:
+                            print(f"   - {node_id}: {output['output'][:100]}...")
+                        elif "generated_text" in output:
+                            print(f"   - {node_id}: {output['generated_text'][:100]}...")
+                        else:
+                            print(f"   - {node_id}: {str(output)[:100]}...")
+                    else:
+                        print(f"   - {node_id}: {str(output)[:100]}...")
     except Exception as e:
         print(f"❌ Concurrent execution failed: {e}")
         concurrent_success = False

@@ -187,6 +187,74 @@ class FlowNodeData(BaseModel):
     # selected_variable_ids: Optional[List[str]] = None
     # output: Optional[Any] = None 
 
+# --- Added to resolve ImportError in main.py ---
+# These are placeholder/basic definitions based on common usage.
+# They might need further refinement if specific structures are critical.
+
+class NodeExecutionRequest(BaseModel):
+    node_id: str
+    inputs: Optional[Dict[str, Any]] = None
+    # Add other fields if known or can be inferred from main.py usage
+
+class EdgeExecutionRequest(BaseModel):
+    from_node: str
+    to_node: str
+    # Add other fields if known
+
+class NodeOutput(BaseModel): # Potentially conflicts with NodeDocument.output field name
+    node_id: str
+    output_data: Optional[Any] = None # Renamed from 'output' to avoid direct conflict
+    # Add other fields like type, error, etc., if needed
+
+class ScriptNode(BaseModel):
+    id: str # Usually the node_id
+    type: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None # For storing arbitrary node data like position, prompt etc.
+    # Based on ReactFlow structure, it might also include 'position', 'input_keys', 'output_keys'
+    position: Optional[Dict[str, float]] = None # e.g., {"x": 0, "y": 0}
+
+class ScriptEdge(BaseModel):
+    id: str # Edge ID, e.g., "edge-from_node-to_node"
+    source: str # Source node_id
+    target: str # Target node_id
+    # Optional: type, animated, label, etc.
+
+class ScriptInfo(BaseModel):
+    nodes: List[ScriptNode]
+    edges: List[ScriptEdge]
+    # Other metadata about the script/flow
+
+class GlobalSettings(BaseModel):
+    default_provider: Optional[str] = None
+    default_model: Optional[str] = None
+    # Other global settings
+
+# The llm.LLMConfig (standard class) is used for internal logic.
+# ModelConfigInput or LLMConfigDocument (Pydantic models from this file) should be used for API I/O.
+
+class SaveFlowRequest(BaseModel):
+    name: str
+    nodes: List[Any] # Could be List[ScriptNode] or List[Dict]
+    edges: List[Any] # Could be List[ScriptEdge] or List[Dict]
+    # Any other relevant flow data to save
+
+class LoadFlowRequest(BaseModel):
+    name: str
+
+class NodeOutputRequest(BaseModel):
+    node_id: str
+
+class NodeUpdateRequest(BaseModel):
+    node_id: str
+    update_data: Dict[str, Any]
+
+class NodeTemplate(BaseModel): # Different from MessageTemplate and PromptTemplate
+    node_id: str
+    template_content: str # or a more structured template definition
+    # Could include input_variables, output_format etc.
+
+# End of added definitions
+
 class ChainDocument(BaseModel):
     id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
     name: str = Field(..., description="Name of the chain/flow")
@@ -234,7 +302,3 @@ class ChainDocument(BaseModel):
             }
         } 
 
-# Remove or comment out NodeInfo if it's no longer used elsewhere
-# class NodeInfo(BaseModel): # For embedding node info in chains
-#     node_id: str
-#     node_name: str 

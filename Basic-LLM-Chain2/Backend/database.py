@@ -29,8 +29,6 @@ async def save_node(node_data: Union[NodeDocument, Dict[str, Any]]) -> str:
     """Save a node to the database or update if it already exists.
     Accepts either a NodeDocument instance or a dictionary."""
     if isinstance(node_data, dict):
-        # If a dict is passed, try to parse it into a NodeDocument
-        # This will also validate the data against the schema
         try:
             node_doc = NodeDocument(**node_data)
         except Exception as e:
@@ -41,16 +39,10 @@ async def save_node(node_data: Union[NodeDocument, Dict[str, Any]]) -> str:
         raise TypeError("node_data must be a NodeDocument instance or a dictionary")
 
     node_id = node_doc.node_id
-
-    # Default name if not provided or empty
-    if not node_doc.name or not node_doc.name.strip():
-        node_doc.name = node_id
-
     existing_node_dict = await nodes_collection.find_one({"node_id": node_id})
 
     if existing_node_dict:
         # Update existing node
-        # Prepare document for MongoDB update
         doc_to_update_with = node_doc.model_dump(by_alias=True, exclude_none=True, exclude_unset=True) 
         update_payload = {k: v for k, v in doc_to_update_with.items() if k not in ["_id", "id", "created_at", "node_id"]}
         
@@ -58,14 +50,6 @@ async def save_node(node_data: Union[NodeDocument, Dict[str, Any]]) -> str:
             return str(existing_node_dict["_id"])
 
         update_payload["updated_at"] = datetime.utcnow()
-        
-        # Preserve name if not in payload or payload name is empty
-        if 'name' not in update_payload or not update_payload.get('name','').strip():
-            if existing_node_dict.get('name') and existing_node_dict.get('name','').strip():
-                 update_payload['name'] = existing_node_dict.get('name')
-            # If existing name is also invalid, and payload name invalid, let it be (or default to node_id if Pydantic model would)
-            # The NodeDocument model itself should handle default for name if it becomes empty upon full update.
-
         await nodes_collection.update_one(
             {"node_id": node_id},
             {"$set": update_payload}
@@ -74,10 +58,8 @@ async def save_node(node_data: Union[NodeDocument, Dict[str, Any]]) -> str:
     else:
         # Insert new node
         doc_to_insert = node_doc.model_dump(by_alias=True, exclude_none=True)
-        # Ensure MongoDB generates the _id by removing any client-side generated/serialized one
         if "_id" in doc_to_insert:
             del doc_to_insert["_id"]
-        # Also remove "id" if it's there from not using by_alias in some internal step
         if "id" in doc_to_insert: 
             del doc_to_insert["id"]
 
@@ -94,12 +76,10 @@ async def get_node(node_id: str) -> Optional[NodeDocument]:
         return NodeDocument(**node_dict)
     return None
 
-async def get_node_name(node_id: str) -> Optional[str]:
-    """Get a node's name by its ID."""
-    node = await nodes_collection.find_one({"node_id": node_id}, {"name": 1, "node_id": 1})
-    if node:
-        return node.get("name", node_id) # Default to node_id if name field is missing
-    return node_id # Or None if strict about not finding it? For now, default to id.
+async def get_node_name(node_id: str) -> str:
+    """Get a node's name by its ID. Returns node_id if name is not set."""
+    node = await nodes_collection.find_one({"node_id": node_id}, {"name": 1})
+    return node.get("name", node_id) if node else node_id
 
 async def save_chain(chain_data: Union[ChainDocument, Dict[str, Any]]) -> str:
     """Save a chain to the database. Accepts ChainDocument or dict."""
@@ -203,12 +183,7 @@ async def update_node_output(node_id: str, output_data: Any) -> bool:
     return result.modified_count > 0
 
 async def update_node_name(node_id: str, name: str) -> bool:
-    """Update the name of a node by its ID and its updated_at timestamp."""
-    if not name or not name.strip():
-        # If new name is empty or whitespace, try to default to node_id or prevent update
-        # For now, we prevent empty names, could also default to node_id.
-        return False # Or raise ValueError("Node name cannot be empty")
-        
+    """Update the name of a node by its ID."""
     result = await nodes_collection.update_one(
         {"node_id": node_id},
         {"$set": {"name": name, "updated_at": datetime.utcnow()}}
